@@ -15,8 +15,6 @@ Content-Type: application/json
   "isStream": false
 }
 
->> {{outputDir}}/tts-default.wav
-
 ### TTS - preset voice with style controls
 POST {{baseUrl}}/api/agent/tools/tts
 Content-Type: application/json
@@ -30,8 +28,6 @@ Content-Type: application/json
   "isStream": false
 }
 
->> {{outputDir}}/tts-styled.wav
-
 ### TTS - streaming PCM16 output
 POST {{baseUrl}}/api/agent/tools/tts
 Content-Type: application/json
@@ -42,8 +38,6 @@ Content-Type: application/json
   "format": "pcm16",
   "isStream": true
 }
-
->> {{outputDir}}/tts-stream.pcm
 
 ### TTS - voice design from prompt
 POST {{baseUrl}}/api/agent/tools/tts
@@ -57,8 +51,6 @@ Content-Type: application/json
   "optimizeTextPreview": true,
   "isStream": false
 }
-
->> {{outputDir}}/tts-voice-design.wav
 
 ### TTS - multipart text file
 # Replace ./article.txt with a real UTF-8 text file before sending.
@@ -84,8 +76,6 @@ Content-Disposition: form-data; name="isStream"
 false
 --boundary--
 
->> {{outputDir}}/tts-file.wav
-
 ### TTS - multipart voice clone file
 # Replace ./article.txt and ./sample.mp3 with real files before sending.
 POST {{baseUrl}}/api/agent/tools/tts
@@ -110,8 +100,6 @@ Content-Disposition: form-data; name="isStream"
 
 false
 --boundary--
-
->> {{outputDir}}/tts-voice-clone.wav
 
 ### TTS - validation error: multiple voice inputs
 POST {{baseUrl}}/api/agent/tools/tts
