@@ -24,6 +24,47 @@ open http://localhost:3000
 }
 ```
 
+### 易用性增强参数
+
+- **`roleId`**：引用服务端预配置角色（见 `src/voices.config.ts`），自动套用其音色与默认风格。与 `voiceId`/`voicePrompt`/`voiceCloneBase64` 互斥。
+- **`stylePreset`**：风格预设 key（见 `src/stylePresets.ts`），如 `温柔`、`磁性`、`东北话`、`唱歌`，自动转换为对应音频标签或自然语言指令。
+- **`singing`**：`true` 时自动添加 `(唱歌)` 标签，**仅 `mimo-v2.5-tts` 支持**（与 `voicePrompt`/`voiceCloneBase64` 互斥）。
+
+```json
+{
+  "text": "晚安，今天也要好好休息。",
+  "roleId": "午夜电台"
+}
+```
+
+```json
+{
+  "text": "全村的希望，冲鸭！",
+  "stylePreset": "东北话"
+}
+```
+
+### 预置音色列表
+
+`GET /api/voices` 返回官方静态预置音色表（ID / 语言 / 性别）。
+
+```bash
+curl http://localhost:3000/api/voices
+```
+
+### 流式 WAV 封装
+
+流式接口默认返回裸 `pcm16`。前端若要直接播放，可加 `?container=wav`，服务端会先写入 44 字节 WAV 头再流式拼接 PCM（无需客户端拼头）：
+
+```bash
+curl -X POST "http://localhost:3000/api/agent/tools/tts?container=wav" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"这是一个流式 WAV 测试。","format":"pcm16","isStream":true}' \
+  --output out.wav
+```
+
+> 注意：`mimo-v2.5-tts-voicedesign` / `mimo-v2.5-tts-voiceclone` 的流式当前为兼容模式（全部推理完成后一次性返回），仅 `mimo-v2.5-tts` 为真流式。
+
 环境变量只作为服务默认值使用，例如 `MIMO_TTS_DEFAULT_VOICE`、`MIMO_TTS_DEFAULT_FORMAT`、`MIMO_TTS_DEFAULT_IS_STREAM`。body 中传入同名能力参数时，以本次请求的 body 为准。
 
 也支持 `multipart/form-data` 上传文本文件，服务会把文件内容转换为 `text` 后再合成。文本文件字段名可用 `textFile` 或 `file`；音色复刻音频文件可用 `voiceCloneFile`。

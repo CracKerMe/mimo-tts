@@ -111,3 +111,50 @@ Content-Type: application/json
   "voicePrompt": "低沉男声",
   "format": "wav"
 }
+
+### TTS - role preset (references src/voices.config.ts)
+POST {{baseUrl}}/api/agent/tools/tts
+Content-Type: application/json
+
+{
+  "text": "欢迎收听今晚的午夜电台，我是陪你入睡的声音。",
+  "roleId": "午夜电台",
+  "format": "wav",
+  "isStream": false
+}
+
+### TTS - style preset (references src/stylePresets.ts)
+POST {{baseUrl}}/api/agent/tools/tts
+Content-Type: application/json
+
+{
+  "text": "全村的希望，冲鸭！这波必须整起来！",
+  "stylePreset": "东北话",
+  "format": "wav",
+  "isStream": false
+}
+
+### TTS - singing mode (only mimo-v2.5-tts)
+POST {{baseUrl}}/api/agent/tools/tts
+Content-Type: application/json
+
+{
+  "text": "原谅我这一生不羁放纵爱自由，也会怕有一天会跌倒。",
+  "voiceId": "Mia",
+  "singing": true,
+  "format": "wav",
+  "isStream": false
+}
+
+### TTS - streaming WAV container (no client-side PCM header needed)
+POST {{baseUrl}}/api/agent/tools/tts?container=wav
+Content-Type: application/json
+
+{
+  "text": "这是一个流式 WAV 封装测试。",
+  "format": "pcm16",
+  "isStream": true
+}
+
+### List preset voices
+GET {{baseUrl}}/api/voices

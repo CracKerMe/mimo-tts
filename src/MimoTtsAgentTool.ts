@@ -2,6 +2,8 @@ import { OpenAI } from 'openai';
 import { z } from 'zod';
 import { PassThrough, Readable } from 'node:stream';
 import { env } from './config.js';
+import { STYLE_PRESETS, STYLE_PRESET_KEYS } from './stylePresets.js';
+import { VOICE_ROLES, VOICE_ROLE_KEYS } from './voices.config.js';
 
 export interface MimoTtsAgentToolOptions {
   apiKey: string;
@@ -41,6 +43,16 @@ const MimoTtsBaseSchema = z
     audioTagStyle: z.string().optional().describe('音频标签风格。如 (磁性) (唱歌) [轻笑]（拼接到 assistant 消息文本前）。'),
     optimizeTextPreview: z.boolean().optional().describe('是否对合成文本进行智能润色（仅 voicedesign 模型支持）。'),
     isStream: z.boolean().optional().describe('是否开启流式返回（pcm16）。未提供时使用服务默认配置。'),
+    // —— 易用性增强：角色 / 风格预设 / 唱歌开关（均基于已支持的标签与自然语言能力）——
+    roleId: z
+      .enum(VOICE_ROLE_KEYS)
+      .optional()
+      .describe('语音角色ID，引用服务端预配置的音色与默认风格；与 voiceId/voicePrompt/voiceCloneBase64 互斥。'),
+    stylePreset: z
+      .enum(STYLE_PRESET_KEYS)
+      .optional()
+      .describe('风格预设key，如 温柔/磁性/东北话/唱歌，自动转换为对应音频标签或指令。'),
+    singing: z.boolean().optional().describe('是否唱歌模式。仅 mimo-v2.5-tts 支持，自动添加 (唱歌) 标签。'),
   });
 
 // 暴露给 LLM Agent 的工具 schema：仅语义参数，能力参数(format/isStream)由服务端决定（N4）
@@ -55,6 +67,18 @@ export const MimoTtsInputSchema = MimoTtsBaseSchema.superRefine((data, ctx) => {
       message: 'voiceId、voicePrompt、voiceCloneBase64 只能提供其中之一；未提供时使用服务默认音色',
     });
   }
+  if (data.roleId && voiceInputs.length > 0) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'roleId 与 voiceId/voicePrompt/voiceCloneBase64 互斥，请二选一',
+    });
+  }
+  if (data.singing && (data.voicePrompt || data.voiceCloneBase64)) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'singing 仅 mimo-v2.5-tts 支持，不能与 voicePrompt/voiceCloneBase64 同时使用',
+    });
+  }
 });
 
 export type MimoTtsInput = z.infer<typeof MimoTtsInputSchema>;
@@ -66,7 +90,13 @@ interface TtsAudioConfig {
   optimize_text_preview?: boolean;
 }
 
-export type MimoTtsResult = { data: Buffer | Readable; format: 'wav' | 'pcm16' };
+export interface MimoTtsMeta {
+  model: string;
+  chars: number;
+  voice?: string;
+}
+
+export type MimoTtsResult = { data: Buffer | Readable; format: 'wav' | 'pcm16'; meta: MimoTtsMeta };
 
 export class MimoTtsAgentTool {
   private readonly client: OpenAI;
@@ -78,7 +108,8 @@ export class MimoTtsAgentTool {
 
   public readonly toolName = 'generate_mimo_tts';
   public readonly description =
-    '小米 MiMo V2.5 语音合成工具，支持预置音色、音色设计、音色复刻，以及风格控制与流式输出。';
+    '小米 MiMo V2.5 语音合成工具，支持预置音色、音色设计、音色复刻，以及风格控制与流式输出。' +
+    '可用 roleId 引用预配置角色、stylePreset 选择风格预设、singing 开启唱歌模式。';
 
   constructor(options: MimoTtsAgentToolOptions) {
     this.client = new OpenAI({
@@ -109,7 +140,8 @@ export class MimoTtsAgentTool {
   }
 
   public async execute(rawParams: unknown): Promise<MimoTtsResult> {
-    const params = MimoTtsInputSchema.parse(rawParams);
+    const parsed = MimoTtsInputSchema.parse(rawParams);
+    const params = this.resolveRole(parsed); // 合并角色默认，便于后续统一处理
 
     const model = this.selectModel(params);
     const messages = this.buildTtsMessages(params);
@@ -117,11 +149,36 @@ export class MimoTtsAgentTool {
     const isStream = params.isStream ?? this.defaultIsStream;
     const audio = this.buildAudioConfig(model, params, format, isStream);
 
+    const meta: MimoTtsMeta = {
+      model,
+      chars: params.text.length,
+      voice: this.describeVoice(model, params),
+    };
+
     if (isStream || audio.format === 'pcm16') {
-      return { data: this.handleStreamRequest(model, messages, audio), format: 'pcm16' };
+      return { data: this.handleStreamRequest(model, messages, audio), format: 'pcm16', meta };
     }
     const data = await this.handleSyncRequest(model, messages, audio);
-    return { data, format };
+    return { data, format, meta };
+  }
+
+  // 角色解析：用预配置默认值补全未显式提供的字段（显式参数优先）
+  private resolveRole(params: MimoTtsInput): MimoTtsInput {
+    if (!params.roleId) return params;
+    const role = VOICE_ROLES[params.roleId];
+    return {
+      ...params,
+      voiceId: params.voiceId ?? role.voice,
+      voicePrompt: params.voicePrompt ?? role.voicePrompt,
+      styleInstruction: params.styleInstruction ?? role.styleInstruction,
+      stylePreset: params.stylePreset ?? role.stylePreset,
+    };
+  }
+
+  private describeVoice(model: string, params: MimoTtsInput): string {
+    if (model === 'mimo-v2.5-tts-voiceclone') return 'clone';
+    if (model === 'mimo-v2.5-tts-voicedesign') return 'design';
+    return params.voiceId ?? this.defaultVoice;
   }
 
   // 模型选择：映射 + 单一决策函数（N3）
@@ -131,7 +188,7 @@ export class MimoTtsAgentTool {
     return 'mimo-v2.5-tts';
   }
 
-  // Prompt 构造集中管理（N2）
+  // Prompt 构造集中管理（N2），并应用风格预设 / 唱歌标签
   private buildTtsMessages(params: MimoTtsInput): OpenAI.Chat.ChatCompletionMessageParam[] {
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
     const userPrompts: string[] = [];
@@ -139,13 +196,28 @@ export class MimoTtsAgentTool {
     const styleInstruction = params.styleInstruction ?? this.defaultStyleInstruction;
     if (styleInstruction) userPrompts.push(styleInstruction);
 
+    // 风格预设的自然语言指令部分
+    if (params.stylePreset) {
+      const preset = STYLE_PRESETS[params.stylePreset];
+      if (preset?.instruction) userPrompts.push(preset.instruction);
+    }
+
     if (userPrompts.length > 0) {
       messages.push({ role: 'user', content: userPrompts.join('\n') });
     }
 
+    // assistant 前缀：风格预设标签 + 自定义音频标签 + 唱歌标签
+    const prefixParts: string[] = [];
+    if (params.stylePreset) {
+      const preset = STYLE_PRESETS[params.stylePreset];
+      if (preset?.tag) prefixParts.push(`(${preset.tag})`);
+    }
+    if (params.audioTagStyle) prefixParts.push(params.audioTagStyle);
+    if (params.singing) prefixParts.push('(唱歌)');
+
     let assistantContent = params.text;
-    if (params.audioTagStyle) {
-      assistantContent = `${params.audioTagStyle}${assistantContent}`;
+    if (prefixParts.length > 0) {
+      assistantContent = `${prefixParts.join('')}${assistantContent}`;
     }
     messages.push({ role: 'assistant', content: assistantContent });
 
