@@ -1,0 +1,20 @@
+{
+  "name": "mimo-tts",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/index.ts",
+    "build": "tsc",
+    "start": "node --env-file=.env dist/index.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.9",
+    "hono": "^4.12.30",
+    "openai": "^6.47.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.0",
+    "typescript": "^7.0.2"
+  }
+}

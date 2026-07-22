@@ -1,0 +1,125 @@
+@baseUrl = http://localhost:3000
+@voiceId = Mia
+@outputDir = ./tmp
+
+### Health check
+GET {{baseUrl}}/
+
+### TTS - default voice, WAV output
+POST {{baseUrl}}/api/agent/tools/tts
+Content-Type: application/json
+
+{
+  "text": "你好，这是一段用于快速测试小米 MiMo TTS 服务的文本。",
+  "format": "wav",
+  "isStream": false
+}
+
+>> {{outputDir}}/tts-default.wav
+
+### TTS - preset voice with style controls
+POST {{baseUrl}}/api/agent/tools/tts
+Content-Type: application/json
+
+{
+  "text": "今天的天气不错，适合出门散步，也适合在家里安静地读一本书。",
+  "voiceId": "{{voiceId}}",
+  "format": "wav",
+  "styleInstruction": "语速自然，情绪温和，停顿清晰。",
+  "audioTagStyle": "(温柔)",
+  "isStream": false
+}
+
+>> {{outputDir}}/tts-styled.wav
+
+### TTS - streaming PCM16 output
+POST {{baseUrl}}/api/agent/tools/tts
+Content-Type: application/json
+
+{
+  "text": "这是一个流式 PCM16 输出测试。",
+  "voiceId": "{{voiceId}}",
+  "format": "pcm16",
+  "isStream": true
+}
+
+>> {{outputDir}}/tts-stream.pcm
+
+### TTS - voice design from prompt
+POST {{baseUrl}}/api/agent/tools/tts
+Content-Type: application/json
+
+{
+  "text": "这段音频用于测试根据音色描述生成新音色。",
+  "voicePrompt": "年轻女性声音，清澈自然，普通话标准，语气亲切。",
+  "format": "wav",
+  "styleInstruction": "保持自然叙述感，不要夸张。",
+  "optimizeTextPreview": true,
+  "isStream": false
+}
+
+>> {{outputDir}}/tts-voice-design.wav
+
+### TTS - multipart text file
+# Replace ./article.txt with a real UTF-8 text file before sending.
+POST {{baseUrl}}/api/agent/tools/tts
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="textFile"; filename="article.txt"
+Content-Type: text/plain
+
+< ./article.txt
+--boundary
+Content-Disposition: form-data; name="voiceId"
+
+{{voiceId}}
+--boundary
+Content-Disposition: form-data; name="format"
+
+wav
+--boundary
+Content-Disposition: form-data; name="isStream"
+
+false
+--boundary--
+
+>> {{outputDir}}/tts-file.wav
+
+### TTS - multipart voice clone file
+# Replace ./article.txt and ./sample.mp3 with real files before sending.
+POST {{baseUrl}}/api/agent/tools/tts
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="textFile"; filename="article.txt"
+Content-Type: text/plain
+
+< ./article.txt
+--boundary
+Content-Disposition: form-data; name="voiceCloneFile"; filename="sample.mp3"
+Content-Type: audio/mpeg
+
+< ./sample.mp3
+--boundary
+Content-Disposition: form-data; name="format"
+
+wav
+--boundary
+Content-Disposition: form-data; name="isStream"
+
+false
+--boundary--
+
+>> {{outputDir}}/tts-voice-clone.wav
+
+### TTS - validation error: multiple voice inputs
+POST {{baseUrl}}/api/agent/tools/tts
+Content-Type: application/json
+
+{
+  "text": "这个请求用于验证错误处理。",
+  "voiceId": "{{voiceId}}",
+  "voicePrompt": "低沉男声",
+  "format": "wav"
+}
