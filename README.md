@@ -43,3 +43,18 @@ curl -X POST http://localhost:3000/api/agent/tools/tts \
   -F "format=wav" \
   --output output.wav
 ```
+
+## 安全与可配置项
+
+公网部署时，本服务默认开启以下防护（详见 `CODE_REVIEW.md`）：
+
+- **鉴权**：`MIMO_TTS_REQUIRE_AUTH=true` 时，调用方必须在请求头携带 `X-API-Key`，且值等于 `MIMO_TTS_SERVER_API_KEY`，否则返回 `401`。
+- **限流**：基于 IP 的内存令牌桶，`MIMO_TTS_RATE_LIMIT` / `MIMO_TTS_RATE_LIMIT_WINDOW` 控制额度，超限返回 `429` 并带 `Retry-After`。
+- **请求体大小**：`MIMO_TTS_MAX_FILE_BYTES` 限制单请求体大小（按 `Content-Length` 提前拒绝）。
+- **输入校验**：`text` 最大长度 `MIMO_TTS_MAX_TEXT_LENGTH`、上传/Base64 音频大小上限，非法输入返回 `422`。
+- **错误脱敏**：所有错误响应仅含 `{ error, requestId }`，明细仅服务端日志，不泄露内部信息。
+- **落盘开关**：`MIMO_TTS_SAVE_AUDIO=false`（默认）时不将合成结果写入 `tmp/`，避免磁盘无限增长。
+
+完整环境变量说明见 `.env.example`（复制为 `.env` 后填入）。本地开发可将 `MIMO_TTS_REQUIRE_AUTH` 设为 `false` 方便自测。
+
+> 注意：环境变量中的布尔值需用 `true`/`false`（或 `1`/`0`）表示；字符串 `"false"` 会被严格解析为 false，而非被误判为 true。
