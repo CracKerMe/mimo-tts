@@ -146,7 +146,9 @@ const mimoTtsTool = new MimoTtsAgentTool({
   maxRetries: env.MIMO_API_MAX_RETRIES,
 });
 
-app.get('/', (c) => c.text('Hello Hono!'));
+import { playgroundHandler } from './playground.js';
+
+app.get('/', playgroundHandler);
 
 // 预置音色列表查询端点（静态，取自官方文档）
 app.get('/api/voices', (c) => c.json({ voices: PRESET_VOICES }));
