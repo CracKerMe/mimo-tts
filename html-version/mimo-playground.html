@@ -1,0 +1,957 @@
+
+<title>MIMO API Playground</title>
+<style>
+/* ── Design tokens ──────────────────────────────── */
+:root {
+  --bg:           #0C0E14;
+  --surface:      #131720;
+  --panel:        #181D28;
+  --card:         #1E2433;
+  --border:       #252D3D;
+  --border-sub:   #1B2030;
+  --accent:       #F06520;
+  --accent-bg:    rgba(240,101,32,.13);
+  --accent-ring:  rgba(240,101,32,.28);
+  --text:         #CDD6E8;
+  --text-2:       #5E6E88;
+  --text-3:       #35435A;
+  --green:        #3DC97A;
+  --red:          #E85555;
+  --yellow:       #E8A840;
+  --code-bg:      #090B10;
+  --sidebar:      280px;
+  --hdr:          52px;
+  --r:            5px;
+  --r2:           8px;
+  --mono:         'JetBrains Mono','Fira Code','Cascadia Code','SF Mono',Menlo,Consolas,monospace;
+  --ui:           -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  --ease:         140ms ease;
+}
+@media (prefers-color-scheme: light) { :root {
+  --bg:#ECEEF2; --surface:#FFF; --panel:#F4F5F8; --card:#FFF;
+  --border:#D2D6E2; --border-sub:#E4E7EF;
+  --text:#1A2035; --text-2:#5A6580; --text-3:#9AABBE; --code-bg:#EEF0F5;
+}}
+:root[data-theme="dark"] {
+  --bg:#0C0E14; --surface:#131720; --panel:#181D28; --card:#1E2433;
+  --border:#252D3D; --border-sub:#1B2030;
+  --text:#CDD6E8; --text-2:#5E6E88; --text-3:#35435A; --code-bg:#090B10;
+}
+:root[data-theme="light"] {
+  --bg:#ECEEF2; --surface:#FFF; --panel:#F4F5F8; --card:#FFF;
+  --border:#D2D6E2; --border-sub:#E4E7EF;
+  --text:#1A2035; --text-2:#5A6580; --text-3:#9AABBE; --code-bg:#EEF0F5;
+}
+
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+body {
+  font-family: var(--ui);
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── Header ───────────────────────────────────────── */
+.hdr {
+  position: fixed; inset: 0 0 auto 0;
+  height: var(--hdr);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 16px; gap: 10px;
+  z-index: 200;
+}
+.logo { display:flex; align-items:center; gap:8px; font-weight:600; font-size:15px; letter-spacing:-.02em; }
+.logo-mark {
+  width:26px; height:26px; background:var(--accent); border-radius:5px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:10px; font-weight:800; color:#fff; letter-spacing:-.5px;
+}
+.hdr-sep { width:1px; height:18px; background:var(--border); }
+.hdr-chip {
+  font-family:var(--mono); font-size:11px; color:var(--text-2);
+  background:var(--panel); border:1px solid var(--border);
+  padding:2px 9px; border-radius:100px;
+}
+.hdr-actions { margin-left:auto; display:flex; align-items:center; gap:6px; }
+.icon-btn {
+  width:30px; height:30px; border-radius:var(--r);
+  border:1px solid var(--border); background:transparent;
+  color:var(--text-2); cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition: color var(--ease), background var(--ease);
+}
+.icon-btn:hover { color:var(--text); background:var(--panel); }
+.status-dot {
+  width:7px; height:7px; border-radius:50%;
+  background:var(--text-3); transition:background var(--ease);
+}
+.status-dot.on { background:var(--green); box-shadow:0 0 6px var(--green); animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
+
+/* ── App layout ───────────────────────────────────── */
+.app {
+  display:flex; height:100vh; padding-top:var(--hdr);
+}
+
+/* ── Sidebar ──────────────────────────────────────── */
+.sidebar {
+  width:var(--sidebar); flex-shrink:0;
+  background:var(--surface); border-right:1px solid var(--border);
+  overflow-y:auto; display:flex; flex-direction:column;
+}
+.sidebar::-webkit-scrollbar { width:3px; }
+.sidebar::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+.sb-section { padding:14px 16px; border-bottom:1px solid var(--border-sub); }
+.sb-section:last-child { border-bottom:none; margin-top:auto; }
+.sb-label {
+  font-size:10px; font-weight:700; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--text-3); margin-bottom:12px;
+}
+.field { margin-bottom:11px; }
+.field:last-child { margin-bottom:0; }
+.field > label { display:block; font-size:12px; color:var(--text-2); font-weight:500; margin-bottom:5px; }
+
+input[type=text], input[type=password], select, textarea {
+  width:100%; background:var(--panel); border:1px solid var(--border);
+  border-radius:var(--r); color:var(--text); font-family:var(--ui);
+  font-size:13px; padding:7px 10px; outline:none;
+  transition:border-color var(--ease); appearance:none;
+}
+input[type=text]:focus, input[type=password]:focus, select:focus, textarea:focus {
+  border-color:var(--accent);
+}
+input::placeholder, textarea::placeholder { color:var(--text-3); }
+
+.inp-wrap { position:relative; }
+.inp-btn {
+  position:absolute; right:7px; top:50%; transform:translateY(-50%);
+  background:none; border:none; color:var(--text-2); cursor:pointer;
+  display:flex; align-items:center; padding:2px;
+  transition:color var(--ease);
+}
+.inp-btn:hover { color:var(--text); }
+.inp-has-btn input { padding-right:32px; }
+
+select {
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235E6E88' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 10px center;
+  padding-right:28px; cursor:pointer;
+}
+
+/* Radio pill group */
+.rpill { display:flex; background:var(--panel); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; }
+.rpill-opt { flex:1; display:flex; }
+.rpill-opt input[type=radio] { display:none; }
+.rpill-opt label {
+  flex:1; display:flex; align-items:center; justify-content:center;
+  height:30px; font-size:12px; cursor:pointer; color:var(--text-2);
+  transition:all var(--ease); margin:0;
+}
+.rpill-opt input[type=radio]:checked + label {
+  background:var(--accent); color:#fff; font-weight:600;
+}
+
+/* Slider */
+.sl-row { display:flex; align-items:center; gap:9px; }
+.sl-row input[type=range] {
+  flex:1; height:3px; padding:0; border:none;
+  -webkit-appearance:none; appearance:none;
+  background:var(--border); border-radius:2px; cursor:pointer;
+}
+.sl-row input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:13px; height:13px;
+  border-radius:50%; background:var(--accent);
+  border:2px solid var(--surface); cursor:pointer;
+}
+.sl-val { font-family:var(--mono); font-size:12px; color:var(--text-2); min-width:30px; text-align:right; font-variant-numeric:tabular-nums; }
+
+/* Toggle */
+.tog-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+.tog-row:last-child { margin-bottom:0; }
+.tog-lbl { font-size:12px; color:var(--text-2); font-weight:500; }
+.tog { position:relative; width:33px; height:19px; flex-shrink:0; }
+.tog input { display:none; }
+.tog-track {
+  position:absolute; inset:0; background:var(--border); border-radius:10px;
+  cursor:pointer; transition:background var(--ease);
+}
+.tog input:checked + .tog-track { background:var(--accent); }
+.tog-track::after {
+  content:''; position:absolute; width:13px; height:13px;
+  left:3px; top:3px; background:#fff; border-radius:50%;
+  transition:transform var(--ease);
+}
+.tog input:checked + .tog-track::after { transform:translateX(14px); }
+
+/* ── Main panel ───────────────────────────────────── */
+.main { flex:1; overflow:hidden; display:flex; flex-direction:column; }
+
+/* Tabs */
+.tabs {
+  display:flex; background:var(--surface);
+  border-bottom:1px solid var(--border);
+  padding:0 16px; gap:0; flex-shrink:0;
+}
+.tab-btn {
+  padding:11px 14px; font-size:13px; color:var(--text-2);
+  background:none; border:none; border-bottom:2px solid transparent;
+  cursor:pointer; font-weight:500; margin-bottom:-1px;
+  transition:color var(--ease), border-color var(--ease);
+}
+.tab-btn:hover { color:var(--text); }
+.tab-btn.active { color:var(--text); border-bottom-color:var(--accent); }
+
+.tab-pane { display:none; flex:1; overflow:hidden; flex-direction:column; }
+.tab-pane.active { display:flex; }
+
+/* ── Chat pane ────────────────────────────────────── */
+.sys-area {
+  padding:10px 16px; border-bottom:1px solid var(--border-sub); flex-shrink:0;
+}
+.sys-hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  cursor:pointer; user-select:none;
+}
+.sys-hdr-txt { font-size:11px; font-weight:700; color:var(--text-2); letter-spacing:.04em; text-transform:uppercase; }
+.sys-chev { color:var(--text-3); font-size:11px; transition:transform var(--ease); }
+.sys-chev.open { transform:rotate(90deg); }
+.sys-body { display:none; margin-top:8px; }
+.sys-body.open { display:block; }
+.sys-body textarea { resize:none; font-family:var(--mono); font-size:12px; min-height:58px; }
+
+/* Messages */
+.msgs {
+  flex:1; overflow-y:auto; padding:16px; display:flex;
+  flex-direction:column; gap:14px;
+}
+.msgs::-webkit-scrollbar { width:3px; }
+.msgs::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+.msg { display:flex; gap:10px; }
+.msg-av {
+  width:28px; height:28px; border-radius:6px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:11px; font-weight:700;
+}
+.msg.user .msg-av   { background:var(--accent-bg); color:var(--accent); border:1px solid var(--accent-ring); }
+.msg.ai .msg-av     { background:var(--panel); color:var(--text-2); border:1px solid var(--border); }
+.msg.err .msg-av    { background:rgba(232,85,85,.12); color:var(--red); border:1px solid rgba(232,85,85,.25); }
+.msg-body { flex:1; min-width:0; }
+.msg-role { font-size:10px; color:var(--text-3); font-weight:700; text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px; }
+.msg-text { font-size:14px; line-height:1.65; white-space:pre-wrap; word-break:break-word; }
+.msg.err .msg-text { color:var(--red); }
+
+.dots { display:flex; gap:4px; align-items:center; padding:3px 0; }
+.dots span { width:5px; height:5px; background:var(--text-3); border-radius:50%; animation:bounce 1.2s ease-in-out infinite; }
+.dots span:nth-child(2) { animation-delay:.2s; }
+.dots span:nth-child(3) { animation-delay:.4s; }
+@keyframes bounce { 0%,60%,100%{transform:translateY(0);opacity:.35} 30%{transform:translateY(-5px);opacity:1} }
+
+.empty {
+  flex:1; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:6px; color:var(--text-3); font-size:13px; text-align:center;
+}
+.empty-icon { font-size:28px; opacity:.4; margin-bottom:4px; }
+
+/* Input bar */
+.inp-bar {
+  padding:12px 16px; border-top:1px solid var(--border);
+  background:var(--surface); flex-shrink:0;
+}
+.inp-bar-top { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.inp-bar-row { display:flex; gap:8px; align-items:flex-end; }
+.inp-bar-row textarea {
+  flex:1; resize:none; min-height:38px; max-height:150px;
+  font-size:14px; padding:8px 12px; border-radius:var(--r2); overflow-y:auto;
+}
+
+.btn-ghost {
+  padding:5px 12px; background:transparent; color:var(--text-2);
+  border:1px solid var(--border); border-radius:var(--r);
+  font-size:12px; cursor:pointer; transition:all var(--ease);
+}
+.btn-ghost:hover { color:var(--text); background:var(--panel); }
+
+.btn-primary {
+  padding:8px 18px; background:var(--accent); color:#fff; border:none;
+  border-radius:var(--r); font-size:13px; font-weight:600; cursor:pointer;
+  display:flex; align-items:center; gap:6px; white-space:nowrap;
+  height:38px; transition:opacity var(--ease), transform var(--ease);
+  flex-shrink:0;
+}
+.btn-primary:hover { opacity:.88; }
+.btn-primary:active { transform:scale(.97); }
+.btn-primary:disabled { opacity:.35; cursor:not-allowed; }
+
+.cors-note {
+  display:none; padding:6px 12px; border-radius:var(--r);
+  background:rgba(232,168,64,.1); border:1px solid rgba(232,168,64,.3);
+  font-size:12px; color:var(--yellow); line-height:1.5;
+}
+.cors-note.show { display:block; }
+
+/* ── Raw pane ─────────────────────────────────────── */
+.raw-pane { padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+.raw-pane::-webkit-scrollbar { width:3px; }
+.raw-pane::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+.code-block { background:var(--code-bg); border:1px solid var(--border); border-radius:var(--r2); overflow:hidden; }
+.code-hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:9px 14px; border-bottom:1px solid var(--border); background:var(--panel);
+}
+.code-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-2); }
+.btn-copy {
+  font-size:11px; color:var(--text-2); background:none; border:none;
+  cursor:pointer; padding:3px 8px; border-radius:4px; transition:all var(--ease);
+}
+.btn-copy:hover { color:var(--text); background:var(--border); }
+.btn-copy.ok { color:var(--green); }
+
+pre.code {
+  padding:14px; font-family:var(--mono); font-size:12px; line-height:1.7;
+  overflow-x:auto; color:var(--text); white-space:pre;
+}
+pre.code.wrap { white-space:pre-wrap; word-break:break-all; }
+
+.jk { color:#7DC1FF; }
+.js { color:#A8E6A3; }
+.jn { color:#F0AD60; }
+.jb { color:#CF9FFF; }
+.jz { color:var(--text-2); }
+
+/* ── Usage pane ───────────────────────────────────── */
+.usage-pane { padding:20px; overflow-y:auto; }
+.usage-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:18px; }
+.u-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:15px; }
+.u-lbl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-2); margin-bottom:7px; }
+.u-val { font-family:var(--mono); font-size:22px; font-weight:600; color:var(--text); font-variant-numeric:tabular-nums; line-height:1; }
+.u-sub { font-size:11px; color:var(--text-3); margin-top:4px; }
+
+/* ── Balance pane ─────────────────────────────────── */
+.bal-pane { padding:20px; overflow-y:auto; }
+.bal-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:20px; margin-bottom:14px; }
+.bal-lbl { font-size:12px; color:var(--text-2); }
+.bal-amt { font-family:var(--mono); font-size:34px; font-weight:700; color:var(--accent); font-variant-numeric:tabular-nums; margin:8px 0 4px; }
+.bal-sub { font-size:12px; color:var(--text-3); }
+.info-box {
+  background:var(--panel); border:1px solid var(--border); border-radius:var(--r);
+  padding:12px 14px; font-size:13px; color:var(--text-2); line-height:1.6; margin-top:14px;
+}
+.info-box a { color:var(--accent); text-decoration:none; }
+.info-box a:hover { text-decoration:underline; }
+
+@media (max-width:680px) {
+  .sidebar { display:none; }
+  .usage-grid { grid-template-columns:1fr 1fr; }
+}
+</style>
+
+<!-- Header -->
+<header class="hdr">
+  <div class="logo">
+    <div class="logo-mark">MI</div>
+    MIMO
+  </div>
+  <div class="hdr-sep"></div>
+  <span class="hdr-chip">API Playground</span>
+  <div class="hdr-actions">
+    <div class="status-dot" id="sdot" title="未连接"></div>
+    <button class="icon-btn" id="theme-btn" title="切换主题">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="5"/>
+        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <!-- Auth -->
+    <div class="sb-section">
+      <div class="sb-label">认证</div>
+      <div class="field">
+        <label for="api-key">API Key</label>
+        <div class="inp-wrap inp-has-btn">
+          <input type="password" id="api-key" placeholder="sk-… 或 tp-…" autocomplete="off" spellcheck="false" style="font-family:var(--mono);font-size:12px">
+          <button class="inp-btn" id="key-eye" title="显示/隐藏 Key">
+            <svg id="eye-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="field">
+        <label>计费方案</label>
+        <div class="rpill">
+          <div class="rpill-opt"><input type="radio" name="plan" id="p-payg" value="payg" checked><label for="p-payg">按量付费</label></div>
+          <div class="rpill-opt"><input type="radio" name="plan" id="p-tok"  value="token"><label for="p-tok">Token 套餐</label></div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="base-url">Base URL</label>
+        <input type="text" id="base-url" value="https://api.xiaomimimo.com/v1" spellcheck="false" style="font-family:var(--mono);font-size:11px">
+      </div>
+    </div>
+
+    <!-- Model -->
+    <div class="sb-section">
+      <div class="sb-label">模型</div>
+      <div class="field">
+        <label>API 格式</label>
+        <div class="rpill">
+          <div class="rpill-opt"><input type="radio" name="fmt" id="f-oai" value="openai" checked><label for="f-oai">OpenAI</label></div>
+          <div class="rpill-opt"><input type="radio" name="fmt" id="f-ant" value="anthropic"><label for="f-ant">Anthropic</label></div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="model">模型</label>
+        <select id="model">
+          <option value="mimo-v2.5-pro">mimo-v2.5-pro</option>
+          <option value="mimo-v2.5-pro-ultraspeed">mimo-v2.5-pro-ultraspeed</option>
+          <option value="mimo-v2.5">mimo-v2.5</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Parameters -->
+    <div class="sb-section">
+      <div class="sb-label">参数</div>
+      <div class="field">
+        <label>温度 (Temperature)</label>
+        <div class="sl-row">
+          <input type="range" id="temp" min="0" max="2" step="0.1" value="0.7">
+          <span class="sl-val" id="temp-v">0.7</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Top-P</label>
+        <div class="sl-row">
+          <input type="range" id="topp" min="0" max="1" step="0.05" value="1">
+          <span class="sl-val" id="topp-v">1.0</span>
+        </div>
+      </div>
+      <div class="field">
+        <label for="maxtok">最大输出 Token</label>
+        <input type="text" id="maxtok" value="2048" style="font-family:var(--mono);font-size:13px">
+      </div>
+      <div class="tog-row" style="margin-top:4px">
+        <span class="tog-lbl">流式输出 (Stream)</span>
+        <label class="tog"><input type="checkbox" id="stream" checked><span class="tog-track"></span></label>
+      </div>
+    </div>
+
+    <!-- Balance shortcut -->
+    <div class="sb-section">
+      <button class="btn-primary" id="bal-sb-btn" style="width:100%;justify-content:center">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>
+        </svg>
+        查询账户余额
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="chat">对话</button>
+      <button class="tab-btn" data-tab="raw">原始请求</button>
+      <button class="tab-btn" data-tab="usage">用量统计</button>
+      <button class="tab-btn" data-tab="bal">账户余额</button>
+    </div>
+
+    <!-- Chat -->
+    <div class="tab-pane active" id="tab-chat">
+      <div class="sys-area">
+        <div class="sys-hdr" id="sys-toggle">
+          <span class="sys-hdr-txt">System Prompt</span>
+          <span class="sys-chev" id="sys-chev">▶</span>
+        </div>
+        <div class="sys-body" id="sys-body">
+          <textarea id="sys-prompt" placeholder="可选：输入系统提示词…" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="msgs" id="msgs">
+        <div class="empty" id="empty">
+          <div class="empty-icon">⚡</div>
+          <div style="color:var(--text-2);font-weight:600;font-size:14px">开始对话</div>
+          <div>在下方输入消息，按 Ctrl+Enter 发送</div>
+        </div>
+      </div>
+      <div class="inp-bar">
+        <div class="inp-bar-top">
+          <button class="btn-ghost" id="clear-btn">清空对话</button>
+          <div class="cors-note" id="cors-note">⚠ 请求可能受跨域限制，请使用代理或通过"原始请求"中的 cURL 命令调用</div>
+        </div>
+        <div class="inp-bar-row">
+          <textarea id="msg-input" placeholder="输入消息，Ctrl+Enter 发送…" rows="1"></textarea>
+          <button class="btn-primary" id="send-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/>
+            </svg>
+            发送
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Raw -->
+    <div class="tab-pane" id="tab-raw">
+      <div class="raw-pane">
+        <div class="code-block">
+          <div class="code-hdr">
+            <span class="code-title">Request Body</span>
+            <button class="btn-copy" id="cp-req">复制</button>
+          </div>
+          <pre class="code" id="raw-req"><span style="color:var(--text-3)">// 发送请求后在此查看</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-hdr">
+            <span class="code-title">cURL 命令</span>
+            <button class="btn-copy" id="cp-curl">复制</button>
+          </div>
+          <pre class="code wrap" id="raw-curl"><span style="color:var(--text-3)">// 等效 cURL 命令</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-hdr">
+            <span class="code-title">Response</span>
+            <button class="btn-copy" id="cp-res">复制</button>
+          </div>
+          <pre class="code" id="raw-res"><span style="color:var(--text-3)">// 响应将显示在此处</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Usage -->
+    <div class="tab-pane" id="tab-usage">
+      <div class="usage-pane">
+        <div class="usage-grid">
+          <div class="u-card">
+            <div class="u-lbl">输入 Token</div>
+            <div class="u-val" id="u-inp">—</div>
+            <div class="u-sub">本次</div>
+          </div>
+          <div class="u-card">
+            <div class="u-lbl">输出 Token</div>
+            <div class="u-val" id="u-out">—</div>
+            <div class="u-sub">本次</div>
+          </div>
+          <div class="u-card">
+            <div class="u-lbl">合计 Token</div>
+            <div class="u-val" id="u-tot">—</div>
+            <div class="u-sub">本次</div>
+          </div>
+          <div class="u-card">
+            <div class="u-lbl">累计输入</div>
+            <div class="u-val" id="su-inp">0</div>
+            <div class="u-sub">本次会话</div>
+          </div>
+          <div class="u-card">
+            <div class="u-lbl">累计输出</div>
+            <div class="u-val" id="su-out">0</div>
+            <div class="u-sub">本次会话</div>
+          </div>
+          <div class="u-card">
+            <div class="u-lbl">累计合计</div>
+            <div class="u-val" id="su-tot">0</div>
+            <div class="u-sub">本次会话</div>
+          </div>
+        </div>
+        <div class="info-box">
+          详细的 Token 用量和请求计数可在
+          <a href="https://platform.xiaomimimo.com/#/console/usage" target="_blank" rel="noopener">MIMO 控制台用量页面</a>
+          查看和导出。
+        </div>
+      </div>
+    </div>
+
+    <!-- Balance -->
+    <div class="tab-pane" id="tab-bal">
+      <div class="bal-pane">
+        <div class="info-box" style="margin-top:0;margin-bottom:14px">
+          MIMO 官方文档目前未公开专门的余额查询接口，用量数据需在
+          <a href="https://platform.xiaomimimo.com/#/console/usage" target="_blank" rel="noopener">控制台用量页</a>
+          查看。下方按常见 REST 约定尝试 <code style="font-family:var(--mono)">GET {base}/v1/balance</code>，
+          若返回 404，请根据实际接口调整右侧路径后重试，或直接前往控制台查看。
+        </div>
+        <div class="bal-card">
+          <div class="bal-lbl">账户可用余额</div>
+          <div class="bal-amt" id="bal-amt">—</div>
+          <div class="bal-sub" id="bal-sub">请输入 API Key 后点击查询</div>
+        </div>
+        <div class="field" style="margin:14px 0">
+          <label for="bal-path">查询路径（可编辑）</label>
+          <input type="text" id="bal-path" value="/v1/balance" spellcheck="false" style="font-family:var(--mono);font-size:12px">
+        </div>
+        <button class="btn-primary" id="bal-btn" style="gap:8px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
+          </svg>
+          查询余额
+        </button>
+        <div class="code-block" id="bal-raw-block" style="display:none;margin-top:14px">
+          <div class="code-hdr">
+            <span class="code-title">API 响应</span>
+            <button class="btn-copy" id="cp-bal">复制</button>
+          </div>
+          <pre class="code" id="bal-raw"></pre>
+        </div>
+        <div class="info-box">
+          若余额 API 不可用，请前往
+          <a href="https://platform.xiaomimimo.com/#/console/overview" target="_blank" rel="noopener">MIMO 控制台</a>
+          查看账户信息及余额详情。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────
+const S = { msgs: [], busy: false, sesIn: 0, sesOut: 0, sesAll: 0, lastReq: null, lastRes: null };
+
+// ── DOM ────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+// ── Theme ──────────────────────────────────────────
+let theme = localStorage.getItem('mimo-theme') || 'dark';
+document.documentElement.setAttribute('data-theme', theme);
+$('theme-btn').addEventListener('click', () => {
+  theme = theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('mimo-theme', theme);
+});
+
+// ── Config getters ─────────────────────────────────
+const gKey   = () => $('api-key').value.trim();
+const gUrl   = () => $('base-url').value.trim().replace(/\/$/, '');
+const gModel = () => $('model').value;
+const gFmt   = () => document.querySelector('input[name="fmt"]:checked').value;
+const gPlan  = () => document.querySelector('input[name="plan"]:checked').value;
+const gTemp  = () => parseFloat($('temp').value);
+const gTopP  = () => parseFloat($('topp').value);
+const gMaxT  = () => parseInt($('maxtok').value) || 2048;
+const gStrm  = () => $('stream').checked;
+const gSys   = () => $('sys-prompt').value.trim();
+
+const URLS = {
+  payg:  { openai: 'https://api.xiaomimimo.com/v1',         anthropic: 'https://api.xiaomimimo.com/anthropic' },
+  token: { openai: 'https://token-plan-cn.xiaomimimo.com/v1', anthropic: 'https://token-plan-cn.xiaomimimo.com/anthropic' },
+};
+
+function syncBaseUrl() {
+  $('base-url').value = URLS[gPlan()][gFmt()];
+}
+
+document.querySelectorAll('input[name="plan"], input[name="fmt"]').forEach(r => r.addEventListener('change', syncBaseUrl));
+
+$('api-key').addEventListener('input', () => {
+  const k = $('api-key').value.trim();
+  if (k.startsWith('tp-')) { $('p-tok').checked = true; syncBaseUrl(); }
+  else if (k.startsWith('sk-')) { $('p-payg').checked = true; syncBaseUrl(); }
+});
+
+// Sliders
+$('temp').addEventListener('input', e => { $('temp-v').textContent = parseFloat(e.target.value).toFixed(1); });
+$('topp').addEventListener('input', e => { $('topp-v').textContent = parseFloat(e.target.value).toFixed(2).replace(/0+$/, '').replace(/\.$/, ''); });
+
+// Key eye
+let keyVis = false;
+$('key-eye').addEventListener('click', () => { keyVis = !keyVis; $('api-key').type = keyVis ? 'text' : 'password'; });
+
+// System prompt toggle
+$('sys-toggle').addEventListener('click', () => {
+  $('sys-body').classList.toggle('open');
+  $('sys-chev').classList.toggle('open');
+});
+
+// Tabs
+document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  $('tab-' + b.dataset.tab).classList.add('active');
+}));
+
+// Textarea auto-resize
+function ar(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 150) + 'px'; }
+$('msg-input').addEventListener('input', () => ar($('msg-input')));
+$('msg-input').addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); send(); }
+});
+
+// ── Utilities ──────────────────────────────────────
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function hjson(obj) {
+  const s = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+  return esc(s)
+    .replace(/"((?:\\.|[^"\\])*)"\s*:/g,  '<span class="jk">"$1"</span>:')
+    .replace(/:\s*"((?:\\.|[^"\\])*)"/g,  ': <span class="js">"$1"</span>')
+    .replace(/:\s*(-?\d+\.?\d*(?:[eE][+-]?\d+)?)/g, ': <span class="jn">$1</span>')
+    .replace(/:\s*(true|false)\b/g,        ': <span class="jb">$1</span>')
+    .replace(/:\s*(null)\b/g,              ': <span class="jz">$1</span>');
+}
+
+function setStatus(on) {
+  $('sdot').classList.toggle('on', on);
+  $('sdot').title = on ? '请求中…' : '就绪';
+}
+
+function switchTab(name) {
+  document.querySelector(`[data-tab="${name}"]`).click();
+}
+
+// Copy buttons
+function setupCopy(id, getFn) {
+  $(id).addEventListener('click', () => {
+    const t = getFn(); if (!t) return;
+    navigator.clipboard.writeText(t).then(() => {
+      const b = $(id); b.textContent = '✓ 已复制'; b.classList.add('ok');
+      setTimeout(() => { b.textContent = '复制'; b.classList.remove('ok'); }, 2000);
+    });
+  });
+}
+setupCopy('cp-req',  () => S.lastReq ? JSON.stringify(S.lastReq.body, null, 2) : '');
+setupCopy('cp-curl', () => $('raw-curl').textContent);
+setupCopy('cp-res',  () => S.lastRes ? (typeof S.lastRes === 'string' ? S.lastRes : JSON.stringify(S.lastRes, null, 2)) : '');
+setupCopy('cp-bal',  () => $('bal-raw').textContent);
+
+// ── Build request ──────────────────────────────────
+function buildReq() {
+  const fmt = gFmt(), base = gUrl(), model = gModel(), sys = gSys(), stream = gStrm();
+  const hdrs = { 'Content-Type': 'application/json', 'api-key': gKey() };
+  let url, body;
+
+  if (fmt === 'openai') {
+    url = `${base}/chat/completions`;
+    const msgs = sys ? [{ role: 'system', content: sys }, ...S.msgs] : [...S.msgs];
+    body = { model, messages: msgs, max_completion_tokens: gMaxT(), temperature: gTemp(), top_p: gTopP(), stream };
+  } else {
+    url = base.includes('/anthropic') ? `${base}/v1/messages` : `${base}/v1/messages`;
+    hdrs['anthropic-version'] = '2023-06-01';
+    body = { model, messages: [...S.msgs], max_tokens: gMaxT(), temperature: gTemp(), top_p: gTopP(), stream };
+    if (sys) body.system = sys;
+  }
+  return { url, hdrs, body };
+}
+
+function updateRaw(url, hdrs, body) {
+  const bodyStr = JSON.stringify(body, null, 2);
+  $('raw-req').innerHTML = hjson(body);
+  S.lastReq = { url, hdrs, body };
+
+  const hdrLines = Object.entries(hdrs)
+    .map(([k, v]) => `  -H "${k}: ${k === 'api-key' ? '${MIMO_API_KEY}' : v}"`)
+    .join(' \\\n');
+  $('raw-curl').textContent = `curl -X POST '${url}' \\\n${hdrLines} \\\n  -d '${bodyStr.replace(/'/g, "'\\''")}'`;
+}
+
+function updateRawRes(data) {
+  $('raw-res').innerHTML = hjson(data);
+  S.lastRes = data;
+}
+
+// ── Messages UI ────────────────────────────────────
+function addMsg(role, content, typing = false) {
+  const em = $('empty'); if (em) em.remove();
+  const area = $('msgs');
+  const d = document.createElement('div');
+  d.className = `msg ${role}`;
+  const avLabel = { user: 'U', ai: 'AI', err: '!' }[role] || 'AI';
+  const roleLabel = { user: '用户', ai: 'MIMO', err: '错误' }[role] || role;
+  d.innerHTML = `
+    <div class="msg-av">${avLabel}</div>
+    <div class="msg-body">
+      <div class="msg-role">${roleLabel}</div>
+      ${typing
+        ? '<div class="msg-text"><div class="dots"><span></span><span></span><span></span></div></div>'
+        : `<div class="msg-text">${esc(content)}</div>`}
+    </div>`;
+  area.appendChild(d);
+  area.scrollTop = area.scrollHeight;
+  return d;
+}
+
+function setMsgText(div, text) {
+  div.querySelector('.msg-text').innerHTML = esc(text);
+  $('msgs').scrollTop = $('msgs').scrollHeight;
+}
+
+function updateUsage(u) {
+  if (!u) return;
+  const inp = u.prompt_tokens || u.input_tokens || 0;
+  const out = u.completion_tokens || u.output_tokens || 0;
+  const tot = u.total_tokens || (inp + out);
+  $('u-inp').textContent = inp.toLocaleString();
+  $('u-out').textContent = out.toLocaleString();
+  $('u-tot').textContent = tot.toLocaleString();
+  S.sesIn  += inp; S.sesOut += out; S.sesAll += tot;
+  $('su-inp').textContent = S.sesIn.toLocaleString();
+  $('su-out').textContent = S.sesOut.toLocaleString();
+  $('su-tot').textContent = S.sesAll.toLocaleString();
+}
+
+// ── Streaming ──────────────────────────────────────
+async function handleStream(res, div) {
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '', full = '', last = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop();
+
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t || t === 'data: [DONE]') continue;
+      if (!t.startsWith('data: ')) continue;
+      try {
+        const j = JSON.parse(t.slice(6));
+        last = j;
+        if (j.choices) full += j.choices[0]?.delta?.content || '';
+        else if (j.type === 'content_block_delta') full += j.delta?.text || '';
+        setMsgText(div, full || '…');
+      } catch { /* partial */ }
+    }
+  }
+
+  const final = full || '（空响应）';
+  setMsgText(div, final);
+  S.msgs.push({ role: 'assistant', content: final });
+  if (last?.usage) { updateUsage(last.usage); updateRawRes(last); }
+}
+
+// ── Send ───────────────────────────────────────────
+async function send() {
+  const txt = $('msg-input').value.trim();
+  if (!txt || S.busy) return;
+  if (!gKey()) { alert('请先输入 API Key'); return; }
+
+  S.msgs.push({ role: 'user', content: txt });
+  addMsg('user', txt);
+  $('msg-input').value = ''; $('msg-input').style.height = 'auto';
+  $('send-btn').disabled = true;
+  $('cors-note').classList.remove('show');
+  S.busy = true;
+
+  const { url, hdrs, body } = buildReq();
+  updateRaw(url, hdrs, body);
+  const aiDiv = addMsg('ai', '', true);
+
+  try {
+    setStatus(true);
+    const res = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) });
+
+    if (!res.ok) {
+      const raw = await res.text();
+      let errData; try { errData = JSON.parse(raw); } catch { errData = raw; }
+      updateRawRes(errData);
+      aiDiv.className = 'msg err';
+      aiDiv.querySelector('.msg-av').textContent = '!';
+      aiDiv.querySelector('.msg-role').textContent = '错误';
+      setMsgText(aiDiv, `HTTP ${res.status} — ${typeof errData === 'object' ? (errData.error?.message || JSON.stringify(errData)) : errData}`);
+      S.msgs.pop(); return;
+    }
+
+    if (body.stream) {
+      await handleStream(res, aiDiv);
+    } else {
+      const data = await res.json();
+      updateRawRes(data);
+      let content = data.choices?.[0]?.message?.content || data.content?.[0]?.text || '';
+      setMsgText(aiDiv, content || '（空响应）');
+      S.msgs.push({ role: 'assistant', content });
+      updateUsage(data.usage);
+    }
+  } catch (err) {
+    const isCors = err.name === 'TypeError';
+    if (isCors) $('cors-note').classList.add('show');
+    aiDiv.className = 'msg err';
+    aiDiv.querySelector('.msg-av').textContent = '!';
+    aiDiv.querySelector('.msg-role').textContent = '错误';
+    setMsgText(aiDiv, isCors
+      ? `网络请求失败（可能是跨域 CORS 限制）\n\n浏览器无法直接访问该 API，请：\n① 使用"原始请求"标签中的 cURL 命令\n② 通过允许跨域的代理服务器中转\n③ 在本地服务器或 Node.js 环境中调用`
+      : `请求失败：${err.message}`);
+    S.msgs.pop();
+  } finally {
+    S.busy = false; $('send-btn').disabled = false; setStatus(false);
+  }
+}
+
+$('send-btn').addEventListener('click', send);
+
+// ── Clear ──────────────────────────────────────────
+$('clear-btn').addEventListener('click', () => {
+  S.msgs = [];
+  $('msgs').innerHTML = `<div class="empty" id="empty">
+    <div class="empty-icon">⚡</div>
+    <div style="color:var(--text-2);font-weight:600;font-size:14px">开始对话</div>
+    <div>在下方输入消息，按 Ctrl+Enter 发送</div>
+  </div>`;
+  $('raw-req').innerHTML  = '<span style="color:var(--text-3)">// 发送请求后在此查看</span>';
+  $('raw-curl').innerHTML = '<span style="color:var(--text-3)">// 等效 cURL 命令</span>';
+  $('raw-res').innerHTML  = '<span style="color:var(--text-3)">// 响应将显示在此处</span>';
+  S.lastReq = null; S.lastRes = null;
+});
+
+// ── Balance ────────────────────────────────────────
+async function checkBalance() {
+  if (!gKey()) { alert('请先输入 API Key'); return; }
+  switchTab('bal');
+  $('bal-amt').textContent = '查询中…';
+  $('bal-sub').textContent = '';
+  $('bal-raw-block').style.display = 'none';
+
+  // Derive base without /v1 or /anthropic suffix
+  const rawBase = gUrl().replace(/\/(v1|anthropic)$/, '');
+  const path = $('bal-path').value.trim() || '/v1/balance';
+  const url = `${rawBase}${path.startsWith('/') ? path : '/' + path}`;
+  const hdrs = { 'api-key': gKey(), 'Content-Type': 'application/json' };
+
+  try {
+    const res = await fetch(url, { method: 'GET', headers: hdrs });
+    const raw = await res.text();
+    let data; try { data = JSON.parse(raw); } catch { data = { error: raw || `HTTP ${res.status}` }; }
+
+    $('bal-raw-block').style.display = 'block';
+    $('bal-raw').innerHTML = hjson(data);
+
+    if (!res.ok) {
+      $('bal-amt').textContent = '—';
+      $('bal-sub').textContent = `查询失败 (HTTP ${res.status})，请前往控制台查看`;
+      return;
+    }
+
+    const amt = data.balance ?? data.total_balance ?? data.available_balance
+              ?? data.credits?.balance ?? data.data?.balance ?? null;
+    if (amt !== null) {
+      $('bal-amt').textContent = `¥ ${parseFloat(amt).toFixed(4)}`;
+      $('bal-sub').textContent = '查询成功';
+    } else {
+      $('bal-amt').textContent = '—';
+      $('bal-sub').textContent = '请查看下方原始响应以获取余额信息';
+    }
+  } catch (err) {
+    $('bal-amt').textContent = '—';
+    $('bal-sub').textContent = `请求失败：${err.message}`;
+    $('bal-raw-block').style.display = 'block';
+    $('bal-raw').textContent = err.message;
+  }
+}
+
+$('bal-btn').addEventListener('click', checkBalance);
+$('bal-sb-btn').addEventListener('click', checkBalance);
+</script>
