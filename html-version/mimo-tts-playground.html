@@ -1,0 +1,856 @@
+<title>MIMO TTS API Playground</title>
+<style>
+/* ── Design tokens ──────────────────────────────── */
+:root {
+  --bg:           #0C0E14;
+  --surface:      #131720;
+  --panel:        #181D28;
+  --card:         #1E2433;
+  --border:       #252D3D;
+  --border-sub:   #1B2030;
+  --accent:       #F06520;
+  --accent-bg:    rgba(240,101,32,.13);
+  --accent-ring:  rgba(240,101,32,.28);
+  --text:         #CDD6E8;
+  --text-2:       #5E6E88;
+  --text-3:       #35435A;
+  --green:        #3DC97A;
+  --red:          #E85555;
+  --yellow:       #E8A840;
+  --blue:         #7DC1FF;
+  --purple:       #CF9FFF;
+  --code-bg:      #090B10;
+  --sidebar:      290px;
+  --hdr:          52px;
+  --r:            5px;
+  --r2:           8px;
+  --mono:         'JetBrains Mono','Fira Code','Cascadia Code','SF Mono',Menlo,Consolas,monospace;
+  --ui:           -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  --ease:         140ms ease;
+}
+@media (prefers-color-scheme: light) { :root {
+  --bg:#F2F4F8; --surface:#FFFFFF; --panel:#F6F8FB; --card:#FFFFFF;
+  --border:#CBD2DE; --border-sub:#E4E8EF;
+  --text:#16203A; --text-2:#4C576B; --text-3:#73808F; --code-bg:#EFF1F6;
+}}
+:root[data-theme="dark"] {
+  --bg:#0C0E14; --surface:#131720; --panel:#181D28; --card:#1E2433;
+  --border:#252D3D; --border-sub:#1B2030;
+  --text:#CDD6E8; --text-2:#5E6E88; --text-3:#35435A; --code-bg:#090B10;
+}
+:root[data-theme="light"] {
+  --bg:#F2F4F8; --surface:#FFFFFF; --panel:#F6F8FB; --card:#FFFFFF;
+  --border:#CBD2DE; --border-sub:#E4E8EF;
+  --text:#16203A; --text-2:#4C576B; --text-3:#73808F; --code-bg:#EFF1F6;
+  /* 语义色在白底下加深，保证对比度与可读性 */
+  --accent:#CC5212; --green:#1E9E5A; --red:#D23B3B; --yellow:#B5791A; --blue:#2F7FD1; --purple:#8A4FD0;
+  --accent-bg:rgba(204,82,18,.12); --accent-ring:rgba(204,82,18,.30);
+}
+/* 亮色下 JSON 语法高亮改为深色调，保证代码区对比度 */
+:root[data-theme="light"] .jk { color:#1F6FB2; }
+:root[data-theme="light"] .js { color:#1E7A3A; }
+:root[data-theme="light"] .jn { color:#B5650E; }
+:root[data-theme="light"] .jb { color:#7A3FB0; }
+:root[data-theme="light"] .jz { color:var(--text-2); }
+
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+body {
+  font-family: var(--ui);
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── Header ───────────────────────────────────────── */
+.hdr {
+  position: fixed; inset: 0 0 auto 0;
+  height: var(--hdr);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 16px; gap: 10px;
+  z-index: 200;
+}
+.logo { display:flex; align-items:center; gap:8px; font-weight:600; font-size:15px; letter-spacing:-.02em; }
+.logo-mark {
+  width:26px; height:26px; background:var(--accent); border-radius:5px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:10px; font-weight:800; color:#fff; letter-spacing:-.5px;
+}
+.hdr-sep { width:1px; height:18px; background:var(--border); }
+.hdr-chip {
+  font-family:var(--mono); font-size:11px; color:var(--text-2);
+  background:var(--panel); border:1px solid var(--border);
+  padding:2px 9px; border-radius:100px;
+}
+.plan-chip {
+  font-family:var(--mono); font-size:11px; font-weight:600;
+  padding:2px 9px; border-radius:100px; border:1px solid;
+}
+.plan-chip.payg  { color:var(--green);  background:rgba(61,201,122,.10);  border-color:rgba(61,201,122,.30); }
+.plan-chip.token { color:var(--purple); background:rgba(207,159,255,.10); border-color:rgba(207,159,255,.32); }
+.hdr-actions { margin-left:auto; display:flex; align-items:center; gap:6px; }
+.icon-btn {
+  width:30px; height:30px; border-radius:var(--r);
+  border:1px solid var(--border); background:transparent;
+  color:var(--text-2); cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition: color var(--ease), background var(--ease);
+}
+.icon-btn:hover { color:var(--text); background:var(--panel); }
+.status-dot {
+  width:7px; height:7px; border-radius:50%;
+  background:var(--text-3); transition:background var(--ease);
+}
+.status-dot.on { background:var(--green); box-shadow:0 0 6px var(--green); animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
+
+/* ── App layout ───────────────────────────────────── */
+.app { display:flex; height:100vh; padding-top:var(--hdr); }
+
+/* ── Sidebar ──────────────────────────────────────── */
+.sidebar {
+  width:var(--sidebar); flex-shrink:0;
+  background:var(--surface); border-right:1px solid var(--border);
+  overflow-y:auto; display:flex; flex-direction:column;
+}
+.sidebar::-webkit-scrollbar { width:3px; }
+.sidebar::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+.sb-section { padding:14px 16px; border-bottom:1px solid var(--border-sub); }
+.sb-label {
+  font-size:10px; font-weight:700; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--text-3); margin-bottom:12px;
+}
+.field { margin-bottom:11px; }
+.field:last-child { margin-bottom:0; }
+.field > label { display:block; font-size:12px; color:var(--text-2); font-weight:500; margin-bottom:5px; }
+.field .hint { font-size:11px; color:var(--text-3); margin-top:5px; line-height:1.5; }
+
+input[type=text], input[type=password], select, textarea {
+  width:100%; background:var(--panel); border:1px solid var(--border);
+  border-radius:var(--r); color:var(--text); font-family:var(--ui);
+  font-size:13px; padding:7px 10px; outline:none;
+  transition:border-color var(--ease); appearance:none;
+}
+input[type=text]:focus, input[type=password]:focus, select:focus, textarea:focus { border-color:var(--accent); }
+input::placeholder, textarea::placeholder { color:var(--text-3); }
+
+.inp-wrap { position:relative; }
+.inp-btn {
+  position:absolute; right:7px; top:50%; transform:translateY(-50%);
+  background:none; border:none; color:var(--text-2); cursor:pointer;
+  display:flex; align-items:center; padding:2px; transition:color var(--ease);
+}
+.inp-btn:hover { color:var(--text); }
+.inp-has-btn input { padding-right:32px; }
+
+select {
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235E6E88' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 10px center;
+  padding-right:28px; cursor:pointer;
+}
+
+/* Radio pill group */
+.rpill { display:flex; background:var(--panel); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; }
+.rpill-opt { flex:1; display:flex; }
+.rpill-opt input[type=radio] { display:none; }
+.rpill-opt label {
+  flex:1; display:flex; align-items:center; justify-content:center;
+  height:30px; font-size:12px; cursor:pointer; color:var(--text-2);
+  transition:all var(--ease); margin:0;
+}
+.rpill-opt input[type=radio]:checked + label { background:var(--accent); color:#fff; font-weight:600; }
+
+/* Slider */
+.sl-row { display:flex; align-items:center; gap:9px; }
+.sl-row input[type=range] {
+  flex:1; height:3px; padding:0; border:none;
+  -webkit-appearance:none; appearance:none; background:var(--border); border-radius:2px; cursor:pointer;
+}
+.sl-row input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:13px; height:13px; border-radius:50%; background:var(--accent);
+  border:2px solid var(--surface); cursor:pointer;
+}
+.sl-val { font-family:var(--mono); font-size:12px; color:var(--text-2); min-width:30px; text-align:right; font-variant-numeric:tabular-nums; }
+
+/* Toggle */
+.tog-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+.tog-row:last-child { margin-bottom:0; }
+.tog-lbl { font-size:12px; color:var(--text-2); font-weight:500; }
+.tog { position:relative; width:33px; height:19px; flex-shrink:0; }
+.tog input { display:none; }
+.tog-track { position:absolute; inset:0; background:var(--border); border-radius:10px; cursor:pointer; transition:background var(--ease); }
+.tog input:checked + .tog-track { background:var(--accent); }
+.tog-track::after { content:''; position:absolute; width:13px; height:13px; left:3px; top:3px; background:#fff; border-radius:50%; transition:transform var(--ease); }
+.tog input:checked + .tog-track::after { transform:translateX(14px); }
+
+/* Segmented control (model) */
+.model-list { display:flex; flex-direction:column; gap:6px; }
+.model-opt {
+  border:1px solid var(--border); border-radius:var(--r); padding:8px 10px; cursor:pointer;
+  transition:all var(--ease); background:var(--panel);
+}
+.model-opt:hover { border-color:var(--text-3); }
+.model-opt input { display:none; }
+.model-opt .mo-name { font-family:var(--mono); font-size:12px; color:var(--text); font-weight:600; }
+.model-opt .mo-desc { font-size:11px; color:var(--text-2); margin-top:2px; line-height:1.4; }
+.model-opt input:checked + .mo-body .mo-name { color:var(--accent); }
+.model-opt:has(input:checked) { border-color:var(--accent); background:var(--accent-bg); }
+
+/* File drop */
+.file-drop {
+  border:1px dashed var(--border); border-radius:var(--r); padding:12px;
+  text-align:center; cursor:pointer; transition:all var(--ease); background:var(--panel);
+}
+.file-drop:hover { border-color:var(--accent); }
+.file-drop .fd-icon { font-size:18px; opacity:.6; }
+.file-drop .fd-txt { font-size:12px; color:var(--text-2); margin-top:4px; }
+.file-drop .fd-name { font-family:var(--mono); font-size:11px; color:var(--green); margin-top:4px; word-break:break-all; }
+input[type=file] { display:none; }
+
+/* ── Main panel ───────────────────────────────────── */
+.main { flex:1; overflow:hidden; display:flex; flex-direction:column; }
+
+.tabs {
+  display:flex; background:var(--surface);
+  border-bottom:1px solid var(--border); padding:0 16px; gap:0; flex-shrink:0;
+}
+.tab-btn {
+  padding:11px 14px; font-size:13px; color:var(--text-2); background:none; border:none;
+  border-bottom:2px solid transparent; cursor:pointer; font-weight:500; margin-bottom:-1px;
+  transition:color var(--ease), border-color var(--ease);
+}
+.tab-btn:hover { color:var(--text); }
+.tab-btn.active { color:var(--text); border-bottom-color:var(--accent); }
+
+.tab-pane { display:none; flex:1; overflow:hidden; flex-direction:column; }
+.tab-pane.active { display:flex; }
+
+/* ── Synthesize pane ──────────────────────────────── */
+.syn-pane { flex:1; overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:14px; }
+.syn-pane::-webkit-scrollbar { width:3px; }
+.syn-pane::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+.syn-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+@media (max-width:880px){ .syn-grid { grid-template-columns:1fr; } }
+.syn-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:14px; }
+.syn-card .sc-label { font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text-2); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+.tag { font-size:10px; font-weight:600; padding:1px 7px; border-radius:100px; font-family:var(--mono); }
+.tag.user { color:var(--blue); background:rgba(125,193,255,.12); }
+.tag.assistant { color:var(--accent); background:var(--accent-bg); }
+.syn-card textarea { resize:vertical; min-height:96px; font-family:var(--ui); line-height:1.6; }
+.req-star { color:var(--red); }
+
+.btn-primary {
+  padding:9px 20px; background:var(--accent); color:#fff; border:none;
+  border-radius:var(--r); font-size:13px; font-weight:600; cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px; white-space:nowrap; height:40px;
+  transition:opacity var(--ease), transform var(--ease);
+}
+.btn-primary:hover { opacity:.88; }
+.btn-primary:active { transform:scale(.97); }
+.btn-primary:disabled { opacity:.35; cursor:not-allowed; }
+
+.btn-ghost {
+  padding:5px 12px; background:transparent; color:var(--text-2);
+  border:1px solid var(--border); border-radius:var(--r); font-size:12px; cursor:pointer; transition:all var(--ease);
+}
+.btn-ghost:hover { color:var(--text); background:var(--panel); }
+
+.action-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.action-bar .spacer { flex:1; }
+
+/* Player */
+.player-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:14px; }
+.player-card .pc-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.player-card .pc-title { font-size:12px; font-weight:700; color:var(--text-2); letter-spacing:.05em; text-transform:uppercase; }
+audio { width:100%; outline:none; }
+.dl-link { font-size:12px; color:var(--accent); text-decoration:none; }
+.dl-link:hover { text-decoration:underline; }
+.empty-player { color:var(--text-3); font-size:13px; text-align:center; padding:18px 0; }
+
+.cors-note {
+  display:none; padding:8px 12px; border-radius:var(--r);
+  background:rgba(232,168,64,.1); border:1px solid rgba(232,168,64,.3);
+  font-size:12px; color:var(--yellow); line-height:1.5;
+}
+.cors-note.show { display:block; }
+
+.status-line { font-size:12px; color:var(--text-2); min-height:18px; }
+.status-line.err { color:var(--red); }
+.status-line.ok { color:var(--green); }
+
+/* ── Raw / Response panes ─────────────────────────── */
+.raw-pane { padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+.raw-pane::-webkit-scrollbar { width:3px; }
+.raw-pane::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+.code-block { background:var(--code-bg); border:1px solid var(--border); border-radius:var(--r2); overflow:hidden; }
+.code-hdr { display:flex; align-items:center; justify-content:space-between; padding:9px 14px; border-bottom:1px solid var(--border); background:var(--panel); }
+.code-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-2); }
+.btn-copy { font-size:11px; color:var(--text-2); background:none; border:none; cursor:pointer; padding:3px 8px; border-radius:4px; transition:all var(--ease); }
+.btn-copy:hover { color:var(--text); background:var(--border); }
+.btn-copy.ok { color:var(--green); }
+
+pre.code { padding:14px; font-family:var(--mono); font-size:12px; line-height:1.7; overflow-x:auto; color:var(--text); white-space:pre; }
+pre.code.wrap { white-space:pre-wrap; word-break:break-all; }
+
+.jk { color:#7DC1FF; }
+.js { color:#A8E6A3; }
+.jn { color:#F0AD60; }
+.jb { color:#CF9FFF; }
+.jz { color:var(--text-2); }
+
+.info-box { background:var(--panel); border:1px solid var(--border); border-radius:var(--r); padding:12px 14px; font-size:13px; color:var(--text-2); line-height:1.6; margin-top:4px; }
+.info-box a { color:var(--accent); text-decoration:none; }
+.info-box a:hover { text-decoration:underline; }
+.info-box code { font-family:var(--mono); font-size:11px; background:var(--code-bg); padding:1px 5px; border-radius:3px; }
+
+.usage-strip { display:flex; gap:18px; flex-wrap:wrap; margin-top:6px; }
+.usage-strip .us { font-family:var(--mono); font-size:13px; color:var(--text); }
+.usage-strip .us b { color:var(--accent); font-weight:700; }
+
+@media (max-width:680px) { .sidebar { display:none; } }
+</style>
+
+<header class="hdr">
+  <div class="logo">
+    <div class="logo-mark">MI</div>
+    MIMO
+  </div>
+  <div class="hdr-sep"></div>
+  <span class="hdr-chip">TTS Playground</span>
+  <span class="plan-chip payg" id="plan-chip">按量付费</span>
+  <div class="hdr-actions">
+    <div class="status-dot" id="sdot" title="未连接"></div>
+    <button class="icon-btn" id="theme-btn" title="切换主题">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <!-- Auth -->
+    <div class="sb-section">
+      <div class="sb-label">认证</div>
+      <div class="field">
+        <label for="api-key">API Key</label>
+        <div class="inp-wrap inp-has-btn">
+          <input type="password" id="api-key" placeholder="sk-… 或 tp-…" autocomplete="off" spellcheck="false" style="font-family:var(--mono);font-size:12px">
+          <button class="inp-btn" id="key-eye" title="显示/隐藏 Key">
+            <svg id="eye-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="auth-method">认证方式</label>
+        <select id="auth-method">
+          <option value="apikey">api-key 请求头（参考页默认）</option>
+          <option value="bearer">Authorization: Bearer（OpenAI SDK）</option>
+        </select>
+        <div class="hint">文档示例使用 OpenAI SDK（Bearer）；你的参考 playground 使用 <code style="font-family:var(--mono)">api-key</code> 头，二者可选。</div>
+      </div>
+      <div class="field">
+        <label>计费方案</label>
+        <div class="rpill">
+          <div class="rpill-opt"><input type="radio" name="plan" id="p-payg" value="payg" checked><label for="p-payg">按量付费</label></div>
+          <div class="rpill-opt"><input type="radio" name="plan" id="p-tok"  value="token"><label for="p-tok">Token 套餐</label></div>
+        </div>
+        <div class="hint" id="plan-hint">按量付费：<code style="font-family:var(--mono)">sk-</code> 密钥 → <code style="font-family:var(--mono)">api.xiaomimimo.com/v1</code></div>
+      </div>
+      <div class="field">
+        <label for="base-url">Base URL</label>
+        <input type="text" id="base-url" value="https://api.xiaomimimo.com/v1" spellcheck="false" style="font-family:var(--mono);font-size:11px">
+      </div>
+    </div>
+
+    <!-- Model -->
+    <div class="sb-section">
+      <div class="sb-label">模型</div>
+      <div class="model-list">
+        <label class="model-opt">
+          <input type="radio" name="model" value="mimo-v2.5-tts" checked>
+          <div class="mo-body">
+            <div class="mo-name">mimo-v2.5-tts</div>
+            <div class="mo-desc">预置精品音色 · 支持唱歌模式 · 不支持音色设计/复刻</div>
+          </div>
+        </label>
+        <label class="model-opt">
+          <input type="radio" name="model" value="mimo-v2.5-tts-voicedesign">
+          <div class="mo-body">
+            <div class="mo-name">mimo-v2.5-tts-voicedesign</div>
+            <div class="mo-desc">文本描述定制音色 · user 消息为必填设计描述</div>
+          </div>
+        </label>
+        <label class="model-opt">
+          <input type="radio" name="model" value="mimo-v2.5-tts-voiceclone">
+          <div class="mo-body">
+            <div class="mo-name">mimo-v2.5-tts-voiceclone</div>
+            <div class="mo-desc">音频样本复刻任意音色 · 上传 mp3/wav</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Voice -->
+    <div class="sb-section">
+      <div class="sb-label">音色</div>
+      <div class="field" id="voice-tts-field">
+        <label for="voice">预置音色</label>
+        <select id="voice">
+          <option value="mimo_default">mimo_default（默认）</option>
+          <option value="冰糖">冰糖（中文·女）</option>
+          <option value="茉莉">茉莉（中文·女）</option>
+          <option value="苏打">苏打（中文·男）</option>
+          <option value="白桦">白桦（中文·男）</option>
+          <option value="Mia">Mia（英文·女）</option>
+          <option value="Chloe">Chloe（英文·女）</option>
+          <option value="Milo">Milo（英文·男）</option>
+          <option value="Dean">Dean（英文·男）</option>
+        </select>
+        <div class="hint">仅 <code style="font-family:var(--mono)">mimo-v2.5-tts</code> 支持预置音色。</div>
+      </div>
+      <div class="field" id="voice-design-field" style="display:none">
+        <div class="hint">本模型以「风格指令（user）」作为<strong>音色设计描述</strong>。可开启下方智能润色，无需填写合成文本。</div>
+        <div class="tog-row" style="margin-top:9px">
+          <span class="tog-lbl">智能润色 (optimize_text_preview)</span>
+          <label class="tog"><input type="checkbox" id="opt-preview"><span class="tog-track"></span></label>
+        </div>
+      </div>
+      <div class="field" id="voice-clone-field" style="display:none">
+        <label>音频样本（复刻源）</label>
+        <div class="file-drop" id="clone-drop">
+          <div class="fd-icon">🎙️</div>
+          <div class="fd-txt">点击选择 mp3 / wav（≤10MB）</div>
+          <div class="fd-name" id="clone-name" style="display:none"></div>
+        </div>
+        <input type="file" id="clone-file" accept=".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav">
+        <div class="hint">样本将转为 Base64 作为 <code style="font-family:var(--mono)">audio.voice</code> 传入，仅支持 mp3 / wav，且 &lt;10MB。</div>
+      </div>
+    </div>
+
+    <!-- Params -->
+    <div class="sb-section">
+      <div class="sb-label">参数</div>
+      <div class="field">
+        <label for="format">输出格式 (audio.format)</label>
+        <select id="format">
+          <option value="wav">wav（非流式推荐）</option>
+          <option value="pcm16">pcm16（流式须用，浏览器将自动包装为 wav 播放）</option>
+        </select>
+      </div>
+      <div class="tog-row">
+        <span class="tog-lbl">流式输出 (Stream)</span>
+        <label class="tog"><input type="checkbox" id="stream"><span class="tog-track"></span></label>
+      </div>
+      <div class="hint" id="stream-hint">流式：tts 模型低延迟实时返回；voicedesign / voiceclone 当前降级为兼容模式（推理完成后一次性返回）。</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="syn">语音合成</button>
+      <button class="tab-btn" data-tab="raw">原始请求</button>
+      <button class="tab-btn" data-tab="res">响应</button>
+    </div>
+
+    <!-- Synthesize -->
+    <div class="tab-pane active" id="tab-syn">
+      <div class="syn-pane">
+        <div class="cors-note" id="cors-note">⚠ 浏览器直连可能受跨域（CORS）限制。若请求失败，请使用「原始请求」标签中的 cURL 命令，或把 Base URL 改为允许跨域的代理。</div>
+        <div class="syn-grid">
+          <div class="syn-card">
+            <div class="sc-label">风格 / 音色指令 <span class="tag user">user</span> <span style="color:var(--text-3);font-weight:400;text-transform:none;letter-spacing:0">可选</span></div>
+            <textarea id="tts-style" placeholder="自然语言风格描述，例如：用温柔轻快的语气，语速适中，带着微笑的感觉。">&quot;用温柔轻快的语气，语速适中，带着微笑的感觉，像在给小朋友讲睡前故事。&quot;</textarea>
+            <div class="hint">支持自然语言控制与 <code style="font-family:var(--mono)">(风格)</code> / <code style="font-family:var(--mono)">[标签]</code> 音频标签控制。voice design 模型下此字段为<strong>必填</strong>的音色设计描述。</div>
+          </div>
+          <div class="syn-card">
+            <div class="sc-label">合成文本 <span class="tag assistant">assistant</span> <span class="req-star">*</span> <span style="color:var(--text-3);font-weight:400;text-transform:none;letter-spacing:0">必填（开启润色除外）</span></div>
+            <textarea id="tts-text" placeholder="要转为语音的文本，必须放在 assistant 角色…">你好，我是 MiMo 语音合成，很高兴为你服务。今天想听点什么故事呢？</textarea>
+            <div class="hint">目标文本必须放在 <code style="font-family:var(--mono)">role: assistant</code> 的 content 中，不可放在 user 消息内。</div>
+          </div>
+        </div>
+
+        <div class="action-bar">
+          <button class="btn-primary" id="synth-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4"/>
+            </svg>
+            生成语音
+          </button>
+          <button class="btn-ghost" id="clear-btn">清空</button>
+          <div class="spacer"></div>
+          <span class="status-line" id="status-line"></span>
+        </div>
+
+        <div class="player-card">
+          <div class="pc-head">
+            <span class="pc-title">音频播放</span>
+            <a class="dl-link" id="dl-link" style="display:none" download="mimo-tts-output.wav">⬇ 下载 wav</a>
+          </div>
+          <div id="player-wrap"><div class="empty-player">生成后将在此处播放音频</div></div>
+          <div id="player-host"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Raw -->
+    <div class="tab-pane" id="tab-raw">
+      <div class="raw-pane">
+        <div class="code-block">
+          <div class="code-hdr"><span class="code-title">Request Body</span><button class="btn-copy" id="cp-req">复制</button></div>
+          <pre class="code" id="raw-req"><span style="color:var(--text-3)">// 生成请求后在此查看</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-hdr"><span class="code-title">cURL 命令</span><button class="btn-copy" id="cp-curl">复制</button></div>
+          <pre class="code wrap" id="raw-curl"><span style="color:var(--text-3)">// 等效 cURL 命令</span></pre>
+        </div>
+        <div class="info-box">
+          Base URL 与认证头会随「计费方案 / 认证方式」自动调整。<br>
+          按量付费：<code>https://api.xiaomimimo.com/v1</code> · Token 套餐：<code>https://token-plan-cn.xiaomimimo.com/v1</code>。
+        </div>
+      </div>
+    </div>
+
+    <!-- Response -->
+    <div class="tab-pane" id="tab-res">
+      <div class="raw-pane">
+        <div class="code-block">
+          <div class="code-hdr"><span class="code-title">Response</span><button class="btn-copy" id="cp-res">复制</button></div>
+          <pre class="code" id="raw-res"><span style="color:var(--text-3)">// 响应将显示在此处</span></pre>
+        </div>
+        <div class="info-box" id="usage-box" style="display:none">
+          <strong>Token 用量</strong>
+          <div class="usage-strip" id="usage-strip"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────
+const S = { busy:false, lastReqBody:null, lastCurl:'', lastRes:null, cloneUri:null, cloneMeta:null, curUrl:null, fragments:[] };
+
+const $ = id => document.getElementById(id);
+
+// ── Theme ──────────────────────────────────────────
+let theme = localStorage.getItem('mimo-tts-theme') || 'light';
+document.documentElement.setAttribute('data-theme', theme);
+$('theme-btn').addEventListener('click', () => {
+  theme = theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('mimo-tts-theme', theme);
+});
+
+// ── Config getters ─────────────────────────────────
+const gKey   = () => $('api-key').value.trim();
+const gUrl   = () => $('base-url').value.trim().replace(/\/$/, '');
+const gModel = () => document.querySelector('input[name="model"]:checked').value;
+const gPlan  = () => document.querySelector('input[name="plan"]:checked').value;
+const gAuth  = () => $('auth-method').value;
+const gVoice = () => $('voice').value;
+const gFormat= () => $('format').value;
+const gStrm  = () => $('stream').checked;
+const gStyle = () => $('tts-style').value.trim();
+const gText  = () => $('tts-text').value.trim();
+const gOpt   = () => $('opt-preview').checked;
+
+const URLS = {
+  payg:  'https://api.xiaomimimo.com/v1',
+  token: 'https://token-plan-cn.xiaomimimo.com/v1'
+};
+function syncBaseUrl() {
+  const u = URLS[gPlan()];
+  if (u) $('base-url').value = u;
+  const chip = $('plan-chip');
+  if (gPlan() === 'token') { chip.textContent = 'Token 套餐'; chip.className = 'plan-chip token'; }
+  else { chip.textContent = '按量付费'; chip.className = 'plan-chip payg'; }
+  const hint = $('plan-hint');
+  hint.innerHTML = gPlan() === 'token'
+    ? 'Token 套餐：<code style="font-family:var(--mono)">tp-</code> 密钥 → <code style="font-family:var(--mono)">token-plan-cn.xiaomimimo.com/v1</code>'
+    : '按量付费：<code style="font-family:var(--mono)">sk-</code> 密钥 → <code style="font-family:var(--mono)">api.xiaomimimo.com/v1</code>';
+}
+document.querySelectorAll('input[name="plan"]').forEach(r => r.addEventListener('change', syncBaseUrl));
+$('api-key').addEventListener('input', () => {
+  const k = $('api-key').value.trim();
+  if (k.startsWith('tp-')) { $('p-tok').checked = true; syncBaseUrl(); }
+  else if (k.startsWith('sk-')) { $('p-payg').checked = true; syncBaseUrl(); }
+});
+
+// Key eye
+let keyVis = false;
+$('key-eye').addEventListener('click', () => { keyVis = !keyVis; $('api-key').type = keyVis ? 'text' : 'password'; });
+
+// Model → voice UI switching
+function syncVoiceUI() {
+  const m = gModel();
+  $('voice-tts-field').style.display   = m === 'mimo-v2.5-tts' ? 'block' : 'none';
+  $('voice-design-field').style.display= m === 'mimo-v2.5-tts-voicedesign' ? 'block' : 'none';
+  $('voice-clone-field').style.display = m === 'mimo-v2.5-tts-voiceclone' ? 'block' : 'none';
+}
+document.querySelectorAll('input[name="model"]').forEach(r => r.addEventListener('change', syncVoiceUI));
+syncVoiceUI();
+
+// Clone file upload
+$('clone-drop').addEventListener('click', () => $('clone-file').click());
+$('clone-file').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const okType = /^audio\/(mpeg|mp3|wav|x-wav)$/i.test(f.type) || /\.(mp3|wav)$/i.test(f.name);
+  if (!okType) { alert('仅支持 mp3 / wav 格式'); e.target.value=''; return; }
+  if (f.size > 10 * 1024 * 1024) { alert('音频样本不能超过 10MB'); e.target.value=''; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    S.cloneUri = reader.result;               // data:audio/...;base64,....
+    S.cloneMeta = { name:f.name, size:f.size, type:f.type };
+    const nm = $('clone-name'); nm.style.display='block'; nm.textContent = `${f.name} · ${(f.size/1024).toFixed(0)} KB`;
+  };
+  reader.readAsDataURL(f);
+});
+
+// Tabs
+document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  $('tab-' + b.dataset.tab).classList.add('active');
+}));
+function switchTab(name){ document.querySelector(`[data-tab="${name}"]`).click(); }
+
+// ── Utilities ──────────────────────────────────────
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function hjson(obj) {
+  const s = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+  return esc(s)
+    .replace(/"((?:\\.|[^"\\])*)"\s*:/g,  '<span class="jk">"$1"</span>:')
+    .replace(/:\s*"((?:\\.|[^"\\])*)"/g,  ': <span class="js">"$1"</span>')
+    .replace(/:\s*(-?\d+\.?\d*(?:[eE][+-]?\d+)?)/g, ': <span class="jn">$1</span>')
+    .replace(/:\s*(true|false)\b/g,        ': <span class="jb">$1</span>')
+    .replace(/:\s*(null)\b/g,              ': <span class="jz">$1</span>');
+}
+function setStatus(on){ $('sdot').classList.toggle('on', on); $('sdot').title = on ? '请求中…' : '就绪'; }
+
+function setupCopy(id, getFn) {
+  $(id).addEventListener('click', () => {
+    const t = getFn(); if (!t) return;
+    navigator.clipboard.writeText(t).then(() => {
+      const b = $(id); b.textContent = '✓ 已复制'; b.classList.add('ok');
+      setTimeout(() => { b.textContent = '复制'; b.classList.remove('ok'); }, 2000);
+    });
+  });
+}
+setupCopy('cp-req',  () => S.lastReqBody ? JSON.stringify(S.lastReqBody, null, 2) : '');
+setupCopy('cp-curl', () => S.lastCurl || '');
+setupCopy('cp-res',  () => S.lastRes ? (typeof S.lastRes === 'string' ? S.lastRes : JSON.stringify(S.lastRes, null, 2)) : '');
+
+// ── Build request ──────────────────────────────────
+function buildReq() {
+  const base = gUrl(), model = gModel(), stream = gStrm(), format = gFormat();
+  const style = gStyle(), text = gText();
+
+  // auth headers
+  const hdrs = { 'Content-Type': 'application/json' };
+  if (gAuth() === 'bearer') hdrs['Authorization'] = `Bearer ${gKey()}`;
+  else hdrs['api-key'] = gKey();
+
+  const url = `${base}/chat/completions`;
+  const messages = [];
+  let audio = { format };
+
+  if (model === 'mimo-v2.5-tts') {
+    if (style) messages.push({ role:'user', content: style });
+    messages.push({ role:'assistant', content: text });
+    audio.voice = gVoice();
+  } else if (model === 'mimo-v2.5-tts-voicedesign') {
+    messages.push({ role:'user', content: style });      // 必填：音色设计描述
+    if (!gOpt() && text) messages.push({ role:'assistant', content: text });
+    audio.optimize_text_preview = gOpt();
+  } else if (model === 'mimo-v2.5-tts-voiceclone') {
+    if (style) messages.push({ role:'user', content: style });
+    messages.push({ role:'assistant', content: text });
+    if (!S.cloneUri) throw new Error('请先上传音频样本用于音色复刻');
+    audio.voice = S.cloneUri;
+  }
+
+  const body = { model, messages, audio, stream };
+  return { url, hdrs, body };
+}
+
+function updateRaw(url, hdrs, body) {
+  S.lastReqBody = body;
+  $('raw-req').innerHTML = hjson(body);
+  const hdrLines = Object.entries(hdrs)
+    .map(([k, v]) => `  -H "${k}: ${k === 'api-key' ? '${MIMO_API_KEY}' : (k === 'Authorization' ? 'Bearer ${MIMO_API_KEY}' : v)}"`)
+    .join(' \\\n');
+  const bodyStr = JSON.stringify(body, null, 2);
+  S.lastCurl = `curl -X POST '${url}' \\\n${hdrLines} \\\n  -d '${bodyStr.replace(/'/g, "'\\''")}'`;
+  $('raw-curl').textContent = S.lastCurl;
+}
+
+function updateRawRes(data) {
+  S.lastRes = data;
+  $('raw-res').innerHTML = hjson(sanitizeForDisplay(data));
+}
+function sanitizeForDisplay(data) {
+  try {
+    const d = JSON.parse(JSON.stringify(data));
+    const a = d.choices?.[0]?.message?.audio;
+    if (a?.data) { try { a.data = `«audio base64, ${atob(a.data).length} bytes»`; } catch { a.data = '«audio base64»'; } }
+    return d;
+  } catch { return data; }
+}
+
+// ── Audio decode / playback ─────────────────────────
+function writeStr(view, off, str){ for(let i=0;i<str.length;i++) view.setUint8(off+i, str.charCodeAt(i)); }
+function base64ToBytes(b64){ const bin = atob(b64); const u = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; }
+function pcm16ToWavBlob(b64){
+  const pcm = base64ToBytes(b64);
+  const numCh = 1, sr = 24000, bits = 16;
+  const byteRate = sr * numCh * bits/8, blockAlign = numCh * bits/8, dataSize = pcm.length;
+  const buf = new ArrayBuffer(44 + dataSize), view = new DataView(buf);
+  writeStr(view,0,'RIFF'); view.setUint32(4,36+dataSize,true); writeStr(view,8,'WAVE');
+  writeStr(view,12,'fmt '); view.setUint32(16,16,true); view.setUint16(20,1,true); view.setUint16(22,numCh,true);
+  view.setUint32(24,sr,true); view.setUint32(28,byteRate,true); view.setUint16(32,blockAlign,true); view.setUint16(34,bits,true);
+  writeStr(view,36,'data'); view.setUint32(40,dataSize,true);
+  new Uint8Array(buf,44).set(pcm);
+  return new Blob([buf], { type:'audio/wav' });
+}
+function playAudio(b64, format){
+  let blob;
+  try { blob = format === 'pcm16' ? pcm16ToWavBlob(b64) : new Blob([base64ToBytes(b64)], { type:'audio/wav' }); }
+  catch(e){ setStatusLine('音频解码失败：' + e.message, 'err'); return; }
+  if (S.curUrl) URL.revokeObjectURL(S.curUrl);
+  const url = URL.createObjectURL(blob); S.curUrl = url;
+  $('player-wrap').innerHTML = '<audio id="player" controls style="width:100%"></audio>';
+  const p = $('player'); p.src = url; p.play().catch(()=>{});
+  const dl = $('dl-link'); dl.href = url; dl.style.display = 'inline';
+}
+
+// ── Status line ─────────────────────────────────────
+function setStatusLine(msg, kind){ const el = $('status-line'); el.textContent = msg || ''; el.className = 'status-line' + (kind ? ' ' + kind : ''); }
+
+// ── Usage ───────────────────────────────────────────
+function showUsage(u){
+  if (!u) return;
+  const box = $('usage-box'); box.style.display = 'block';
+  const inp = u.prompt_tokens || u.input_tokens || 0;
+  const out = u.completion_tokens || u.output_tokens || 0;
+  const tot = u.total_tokens || (inp + out);
+  $('usage-strip').innerHTML =
+    `<span class="us">输入 <b>${inp.toLocaleString()}</b></span>` +
+    `<span class="us">输出 <b>${out.toLocaleString()}</b></span>` +
+    `<span class="us">合计 <b>${tot.toLocaleString()}</b></span>`;
+}
+
+// ── Streaming (TTS) ─────────────────────────────────
+async function handleStreamTTS(res){
+  const reader = res.body.getReader(); const dec = new TextDecoder();
+  let buf = '', fragments = [], finalAudio = null, lastUsage = null;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream:true });
+    const lines = buf.split('\n'); buf = lines.pop();
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t || t === 'data: [DONE]') continue;
+      if (!t.startsWith('data: ')) continue;
+      try {
+        const j = JSON.parse(t.slice(6));
+        const d = j.choices?.[0]?.delta;
+        if (d?.audio?.data) fragments.push(d.audio.data);
+        const ma = j.choices?.[0]?.message?.audio?.data; if (ma) finalAudio = ma;
+        if (j.usage) lastUsage = j.usage;
+      } catch {}
+    }
+  }
+  let b64 = fragments.join('');
+  if (!b64 && finalAudio) b64 = finalAudio;
+  if (b64) playAudio(b64, gFormat());
+  if (lastUsage) showUsage(lastUsage);
+  setStatusLine(b64 ? '流式合成完成，已拼接音频。' : '流式完成，但未收到音频数据。', b64 ? 'ok' : 'err');
+}
+
+// ── Synthesize ──────────────────────────────────────
+async function synth(){
+  if (S.busy) return;
+  if (!gKey()) { alert('请先输入 API Key'); return; }
+  const model = gModel(), text = gText(), style = gStyle();
+  if (model === 'mimo-v2.5-tts-voicedesign') {
+    if (!style) { alert('voice design 模型需要填写「风格 / 音色指令」（作为音色设计描述）'); return; }
+    if (!gOpt() && !text) { alert('请填写合成文本，或开启「智能润色」以自动生成'); return; }
+  } else if (!text) {
+    alert('请填写要合成的文本（assistant 内容）'); return;
+  }
+
+  let req;
+  try { req = buildReq(); }
+  catch(e){ alert(e.message); return; }
+
+  updateRaw(req.url, req.hdrs, req.body);
+  S.busy = true; $('synth-btn').disabled = true; setStatus(true); setStatusLine('请求中…');
+  $('cors-note').classList.remove('show');
+
+  try {
+    const res = await fetch(req.url, { method:'POST', headers: req.hdrs, body: JSON.stringify(req.body) });
+    if (!res.ok) {
+      const raw = await res.text();
+      let errData; try { errData = JSON.parse(raw); } catch { errData = raw; }
+      updateRawRes(errData);
+      setStatusLine(`HTTP ${res.status} — ${typeof errData==='object' ? (errData.error?.message || JSON.stringify(errData)) : errData}`, 'err');
+      switchTab('res');
+      return;
+    }
+    if (req.body.stream) {
+      await handleStreamTTS(res);
+      updateRawRes({ note: '流式响应：音频片段已拼接并播放；usage 见下方用量区。' });
+    } else {
+      const data = await res.json();
+      updateRawRes(data);
+      const audioObj = data.choices?.[0]?.message?.audio;
+      if (audioObj?.data) { playAudio(audioObj.data, req.body.audio.format); setStatusLine('合成完成。', 'ok'); }
+      else setStatusLine('响应成功，但未找到 audio 数据。', 'err');
+      if (audioObj?.transcript) setStatusLine('合成完成。转写：' + audioObj.transcript, 'ok');
+      if (data.usage) showUsage(data.usage);
+    }
+  } catch (err) {
+    const isCors = err.name === 'TypeError';
+    if (isCors) $('cors-note').classList.add('show');
+    setStatusLine(isCors
+      ? '网络请求失败（疑似跨域 CORS 限制）——请改用「原始请求」中的 cURL，或通过代理中转。'
+      : '请求失败：' + err.message, 'err');
+  } finally {
+    S.busy = false; $('synth-btn').disabled = false; setStatus(false);
+  }
+}
+
+$('synth-btn').addEventListener('click', synth);
+
+// ── Clear ───────────────────────────────────────────
+$('clear-btn').addEventListener('click', () => {
+  if (S.curUrl) { URL.revokeObjectURL(S.curUrl); S.curUrl = null; }
+  $('player-wrap').innerHTML = '<div class="empty-player">生成后将在此处播放音频</div>';
+  $('dl-link').style.display = 'none';
+  setStatusLine('');
+  $('raw-req').innerHTML = '<span style="color:var(--text-3)">// 生成请求后在此查看</span>';
+  $('raw-curl').innerHTML = '<span style="color:var(--text-3)">// 等效 cURL 命令</span>';
+  $('raw-res').innerHTML  = '<span style="color:var(--text-3)">// 响应将显示在此处</span>';
+  $('usage-box').style.display = 'none';
+  S.lastReqBody = null; S.lastCurl = ''; S.lastRes = null;
+});
+
+// init
+syncBaseUrl();
+</script>
