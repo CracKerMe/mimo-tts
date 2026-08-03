@@ -1,3 +1,11 @@
+## Mimo use for typescript
+
+## lite version
+
+[html 版 playground](/html-version/mimo-playground.html)
+[html 版 TTS 相关的 playground](/html-version/mimo-tts-playground.html)
+
+
 ```
 npm install
 npm run dev
